@@ -25,6 +25,13 @@ void SPI1_Init(void) {
     GPIOA->CRL &= ~(0xF << 4);  // PA1
     GPIOA->CRL |= (0x3 << 4);
 
+    // PA3 = /RST — выход, push-pull
+    GPIOA->CRL &= ~(0xF << 12); // очистить биты для PA3
+    GPIOA->CRL |= (0x3 << 12);  // MODE=11 (50 MHz), CNF=00 → Output PP
+
+    // Установить /RST в HIGH (неактивное состояние)
+    GPIOA->ODR |= (1 << 3);
+
     // Устанавливаем CS=1 (неактивен), DC=1 (режим данных по умолчанию)
     GPIOA->ODR |= (1 << 4) | (1 << 1);
 
@@ -45,22 +52,28 @@ void SPI1_Write(uint8_t data) {
 
 // Отправка команды на дисплей
 void SSD1306_SendCmd(uint8_t cmd) {
-    GPIOA->ODR &= ~(1 << 4); // CS = 0
-    GPIOA->ODR &= ~(1 << 1); // DC = 0 → команда
+    GPIOA->ODR &= ~(1 << 4); // /CE = LOW (активен)
+    GPIOA->ODR &= ~(1 << 1); // DC = LOW → команда
     SPI1_Write(cmd);
-    GPIOA->ODR |= (1 << 4);  // CS = 1
+    GPIOA->ODR |= (1 << 4);  // /CE = HIGH
 }
 
 // Отправка данных на дисплей
 void SSD1306_SendData(uint8_t data) {
-    GPIOA->ODR &= ~(1 << 4); // CS = 0
-    GPIOA->ODR |= (1 << 1);  // DC = 1 → данные
+    GPIOA->ODR &= ~(1 << 4); // /CE = LOW
+    GPIOA->ODR |= (1 << 1);  // DC = HIGH → данные
     SPI1_Write(data);
-    GPIOA->ODR |= (1 << 4);  // CS = 1
+    GPIOA->ODR |= (1 << 4);  // /CE = HIGH
 }
 
 // Инициализация дисплея SSD1306
 void SSD1306_Init(void) {
+    // Хардварный сброс
+    GPIOA->ODR &= ~(1 << 3); // /RST = LOW
+    delay_ms(10);
+    GPIOA->ODR |= (1 << 3);  // /RST = HIGH
+    delay_ms(10);
+
     SSD1306_SendCmd(0xAE); // Display OFF
     SSD1306_SendCmd(0xD5); // Set Display Clock Div
     SSD1306_SendCmd(0x80);
